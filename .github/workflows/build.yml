@@ -48,6 +48,11 @@ jobs:
           git -C mf sparse-checkout set "LVGL project/libraries/Arduino_GFX-1.3.7"
           mkdir -p "$HOME/Arduino/libraries"
           cp -r "mf/LVGL project/libraries/Arduino_GFX-1.3.7" "$HOME/Arduino/libraries/Arduino_GFX"
+          # This fork's Arduino_TFT.cpp has a leftover `#include "pin_config.h"`
+          # (no symbols used). Locally it resolves from the sketch folder; on the
+          # CI runner the sketch dir isn't on the library include path, so drop a
+          # copy next to the source to satisfy the quoted include.
+          cp "06_PasswordManager/pin_config.h" "$HOME/Arduino/libraries/Arduino_GFX/src/pin_config.h"
 
       - name: Patch ESP32 BLE Keyboard (NimBLE backend + Just-Works pairing)
         run: |
