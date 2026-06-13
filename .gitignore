@@ -1,0 +1,42 @@
+# ── Arduino / ESP32 build artifacts ──────────────────────────
+build/
+build_cli/
+*.bin
+*.elf
+*.map
+*.hex
+*.uf2
+*.d
+*.o
+*.a
+compile_commands.json
+_compile.txt
+sk_compile_log.txt
+
+# ── Archives / exports ───────────────────────────────────────
+*.zip
+*.7z
+*.tar
+*.tar.gz
+
+# ── Vendor SDK copies (install via Library Manager instead) ──
+lib/
+example/
+LVGL project/
+web/
+
+# ── Large reference material (kept out of git; see links) ────
+datasheet/
+
+# ── Editor / OS noise ────────────────────────────────────────
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.cache/
+
+# ── Secrets — never commit a real vault or credentials ───────
+db.bin
+*.secret
+secrets.h

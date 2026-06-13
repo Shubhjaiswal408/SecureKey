@@ -1,0 +1,53 @@
+name: Build
+
+# Compiles the SecureKey firmware on every push / PR so the build badge is real.
+on:
+  push:
+    paths:
+      - "06_PasswordManager/**"
+      - ".github/workflows/build.yml"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s
+          echo "$PWD/bin" >> "$GITHUB_PATH"
+
+      - name: Install ESP32 core 2.0.16
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls \
+            https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.16
+
+      - name: Install libraries (pinned)
+        run: |
+          arduino-cli lib install "GFX Library for Arduino@1.3.7"
+          arduino-cli lib install "NimBLE-Arduino@1.4.3"
+          arduino-cli lib install "Adafruit NeoPixel"
+          arduino-cli lib install "ESP32 BLE Keyboard"
+
+      - name: Patch ESP32 BLE Keyboard (NimBLE backend + Just-Works pairing)
+        run: |
+          LIB="$HOME/Arduino/libraries/ESP32_BLE_Keyboard"
+          # Enable the NimBLE backend (coexists with native USB HID, half the RAM)
+          sed -i 's|^[[:space:]]*//[[:space:]]*#define USE_NIMBLE|#define USE_NIMBLE|' "$LIB/BleKeyboard.h"
+          grep -q "^#define USE_NIMBLE" "$LIB/BleKeyboard.h" || sed -i '1i #define USE_NIMBLE' "$LIB/BleKeyboard.h"
+          # "Just Works" pairing (no passkey IO on this device)
+          sed -i 's|setSecurityAuth(true, true, true)|setSecurityAuth(true, false, false)|' "$LIB/BleKeyboard.cpp"
+
+      - name: Compile firmware
+        run: |
+          arduino-cli compile \
+            --fqbn "esp32:esp32:esp32s3:PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,FlashSize=16M,USBMode=default,CDCOnBoot=cdc" \
+            --warnings default \
+            06_PasswordManager
