@@ -18,6 +18,38 @@ Built on a 1.8" AMOLED touchscreen ESP32‑S3. No cloud. No app account. Your va
 
 > **SecureKey** is a DIY [hardware password manager](https://en.wikipedia.org/wiki/Password_manager) — a tiny touchscreen "keyboard emulator." Pick an entry, tap a field, and the device types it into whatever it's plugged into (PC over USB‑C) or paired with (phone/laptop over Bluetooth). Because it presents itself as a **HID keyboard**, it works on any OS with zero drivers, zero browser extensions, and zero software installed. The secrets live in flash on the device, behind a PIN — never synced, never uploaded.
 
+<p align="center">
+  <img src="docs/img/showcase.svg" alt="SecureKey on-device screens — Lock, Home, and password Detail" width="100%">
+  <br><sub><i>Illustrative renders of the on‑device UI · 368 × 448 AMOLED</i></sub>
+</p>
+
+---
+
+## 🔑 What it does, in one picture
+
+```mermaid
+flowchart LR
+    V["Your vault<br/>lives on the device"] --> P["Pick an entry,<br/>tap a field"]
+    P --> Q{"Connected<br/>how?"}
+    Q -->|USB-C cable| U["Types into your<br/>PC / Mac as a keyboard"]
+    Q -->|Bluetooth| W["Types into your phone<br/>or laptop, wirelessly"]
+```
+
+To the computer it just looks like someone typing — **no app, no browser extension, no account.**
+
+---
+
+## 🆚 How it compares
+
+| | **SecureKey** | Cloud manager | Browser autofill |
+|---|:---:|:---:|:---:|
+| Where the secrets live | 🔒 on the device | ☁️ a company server | 💻 your browser profile |
+| Needs an account | ❌ | ✅ | ✅ |
+| Needs software on the host | ❌ | ✅ | ✅ |
+| Works on any device, no install | ✅ | ❌ | ❌ |
+| Usable fully offline | ✅ | ❌ | ❌ |
+| Open hardware + firmware | ✅ | ❌ | ❌ |
+
 ---
 
 ## ✨ Features
@@ -37,17 +69,20 @@ Built on a 1.8" AMOLED touchscreen ESP32‑S3. No cloud. No app account. Your va
 
 ---
 
-## 📸 Screens
+## 🧭 Getting around
 
-> _Add photos/GIFs of the device here — drop them in `docs/img/` and reference them below._
+```mermaid
+flowchart LR
+    L["Lock"] --> P["PIN"]
+    P --> H["Home"]
+    H --> List["Passwords"]
+    H --> Add["Add new"]
+    H --> Fav["Favorites"]
+    H --> Set["Settings"]
+    List --> D["Detail<br/>tap a field → it types"]
+```
 
-| Lock | PIN | Home (Vault) | Password list |
-|---|---|---|---|
-| _padlock badge + glow_ | _circular keypad_ | _color tiles + count_ | _letter avatars_ |
-
-| Detail (Edit / Fav / Delete) | Settings | BLE request | Wi‑Fi import |
-|---|---|---|---|
-| _tap a field to type it_ | _pill toggles_ | _Accept / Reject / Block_ | _captive portal_ |
+> The renders at the top show the Lock, Home, and Detail screens. Real device photos are welcome — drop them in `docs/img/` and link them here.
 
 ---
 
@@ -158,6 +193,19 @@ USB HID uses **TinyUSB**; Bluetooth HID uses **NimBLE** (chosen over Bluedroid b
 
 ### 📶 The Bluetooth pairing gate
 A BLE *central* (your phone) can connect to the device any time, but SecureKey **types nothing until you physically accept it** on‑screen — and the prompt only appears *after* you've entered your PIN. You can **Accept**, **Reject** (snoozes the prompt so an auto‑reconnecting phone doesn't nag), or **Block 5 min** (drops the radio). The prompt shows the peer's Bluetooth MAC. *(A BLE central doesn't transmit a friendly name to a keyboard, so the address is what's identifiable.)*
+
+```mermaid
+sequenceDiagram
+    participant Phone
+    participant SecureKey
+    participant You
+    Phone->>SecureKey: BLE connect
+    Note over SecureKey: typing stays BLOCKED
+    SecureKey->>You: "A device wants to connect" (after PIN unlock)
+    You-->>SecureKey: Accept / Reject / Block 5 min
+    Note over SecureKey: only Accept unlocks typing
+    SecureKey->>Phone: now types your password
+```
 
 ### 🔑 The Android `@`→`"` fix
 HID sends key *positions*, not characters. On a host set to a UK/Android layout, `Shift+2` is `"` (not `@`), and `@` lives on `Shift+'`. The **Android @ Fix** toggle swaps those two keycodes on the BLE path so symbols land correctly — the classic US↔UK keyboard difference, solved in firmware.
