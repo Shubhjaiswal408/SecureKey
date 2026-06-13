@@ -31,13 +31,23 @@ jobs:
 
       - name: Install libraries (pinned)
         run: |
-          arduino-cli lib install "GFX Library for Arduino@1.3.7"
           arduino-cli lib install "NimBLE-Arduino@1.4.3"
           arduino-cli lib install "Adafruit NeoPixel"
           # ESP32 BLE Keyboard (T-vK) is GitHub-only — not in the Library
           # Manager index — so install it straight from its Git URL.
           arduino-cli config set library.enable_unsafe_install true
           arduino-cli lib install --git-url https://github.com/T-vK/ESP32-BLE-Keyboard.git
+
+      - name: Install Makerfabs Arduino_GFX fork (adds SH8601 + Display_Brightness)
+        run: |
+          # The MaTouch board needs Makerfabs' fork of GFX-1.3.7 (the stock
+          # Library Manager GFX lacks the SH8601 AMOLED driver and the
+          # Display_Brightness() method). Sparse-clone just that one folder.
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/Makerfabs/MaTouch-ESP32-S3-AMOLED-with-Touch-1.8-FT3168.git mf
+          git -C mf sparse-checkout set "LVGL project/libraries/Arduino_GFX-1.3.7"
+          mkdir -p "$HOME/Arduino/libraries"
+          cp -r "mf/LVGL project/libraries/Arduino_GFX-1.3.7" "$HOME/Arduino/libraries/Arduino_GFX"
 
       - name: Patch ESP32 BLE Keyboard (NimBLE backend + Just-Works pairing)
         run: |
@@ -54,5 +64,4 @@ jobs:
         run: |
           arduino-cli compile \
             --fqbn "esp32:esp32:esp32s3:PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,FlashSize=16M,USBMode=default,CDCOnBoot=cdc" \
-            --warnings default \
             06_PasswordManager
