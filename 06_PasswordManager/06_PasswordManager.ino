@@ -310,14 +310,16 @@ void onSwipeEnd(int16_t totalDx, int16_t totalDy) {
 
 // ── One-tap login fill (username + Tab + password + Enter) ────────────
 void quickFillViaHID(const char *user, const char *pass) {
-  // BLE first (wireless), then USB.
-  if (settings.bleEnabled && hidBleCompiled() && hidBleConnected()) {
+  // BLE first (wireless), then USB. BLE requires the on-device Accept gate
+  // (bleAuthorized) — same rule as typeViaHID — so a connected-but-unaccepted
+  // host can never be filled. USB requires the host to have enumerated us.
+  if (settings.bleEnabled && hidBleCompiled() && hidBleConnected() && bleAuthorized) {
     Serial.printf("[HID] quickFill→BLE user='%s'\n", user);
     hidBleQuickFill(user, pass);
     ledSet(0x0000FF, 250);
     return;
   }
-  if (settings.usbHidEnabled && hidUsbCompiled()) {
+  if (settings.usbHidEnabled && hidUsbCompiled() && hidUsbMounted()) {
     Serial.printf("[HID] quickFill→USB user='%s'\n", user);
     hidUsbQuickFill(user, pass);
     ledSet(0x00FF00, 250);
@@ -439,7 +441,8 @@ void bleConnectGate() {
   uint16_t x, y;
   while (ftReadTouch(x, y)) delay(8);        // let any prior press lift
   uint32_t t0 = millis();
-  int choice = 1;                            // default = reject (timeout/drop)
+  int  choice = 1;                           // default = reject (timeout/drop)
+  bool tapped = false;                       // did the user actually choose?
   while (millis() - t0 < 20000) {
     if (!hidBleConnected()) {
       // Tolerate a brief flap during the pairing/bonding handshake — only
@@ -451,12 +454,17 @@ void bleConnectGate() {
     if (ftReadTouch(x, y)) {
       uint16_t py = y;
       while (ftReadTouch(x, y)) delay(8);    // wait for release
-      if      (py >= y1 && py < y1 + bh) { choice = 0; break; }
-      else if (py >= y2 && py < y2 + bh) { choice = 1; break; }
-      else if (py >= y3 && py < y3 + bh) { choice = 2; break; }
+      if      (py >= y1 && py < y1 + bh) { choice = 0; tapped = true; break; }
+      else if (py >= y2 && py < y2 + bh) { choice = 1; tapped = true; break; }
+      else if (py >= y3 && py < y3 + bh) { choice = 2; tapped = true; break; }
     }
     delay(10);
   }
+
+  // The gate blocks the loop and reads touch directly, so pollTouch never ran
+  // — without this, the idle auto-lock could fire the instant you accept.
+  // A genuine button tap counts as activity; a walk-away timeout does not.
+  if (tapped) lastActivityMs = millis();
 
   if (choice == 0) {                         // ACCEPT
     bleAuthorized = true;

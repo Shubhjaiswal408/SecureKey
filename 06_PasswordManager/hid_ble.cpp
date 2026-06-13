@@ -38,11 +38,16 @@
   static const uint16_t BLE_SETTLE_MS = 240; // wait before the 1st key (host subscribe)
   static bool everConn = false;              // have we ever been connected this link?
 
-  // Type one character. In "Android fix" mode, '@' and '"' are sent as the
-  // raw keycodes that produce them on a UK/Android host (where Shift+2 = "
-  // and Shift+' = @), instead of the US asciimap (Shift+2 = @). This is the
-  // classic US<->UK swap that makes @ come out as " on many Android phones.
+  // Type one character: press, hold past one connection interval, then a clean
+  // key-up. The library's US asciimap is correct; the host applies its own
+  // layout. In "Android fix" mode (for UK/Android-layout hosts where Shift+2
+  // produces " instead of @) we swap the two affected keys: @ is sent as
+  // Shift+' and " as Shift+2, which come out right on those hosts.
   static void bleType(char c) {
+    // The library's asciimap only covers 0..127. A byte >= 128 (a UTF-8 /
+    // extended char in a password) would fall through to the library's
+    // function-key path and emit a stray F-key / modifier — skip it instead.
+    if ((uint8_t)c >= 128) return;
     if (androidFix && c == '@') {
       kb.press(KEY_LEFT_SHIFT); kb.press('\'');   // @ on UK/Android
     } else if (androidFix && c == '"') {
@@ -160,7 +165,7 @@ void hidBlePrint(const char *s) {
   delay(everConn ? 60 : BLE_SETTLE_MS);
   everConn = true;
   int n = strlen(s);
-  Serial.printf("[BLE]   sending %d chars... (androidFix=%d)\n", n, androidFix);
+  Serial.printf("[BLE]   sending %d chars...\n", n);
   kb.releaseAll();                 // make sure nothing is held before we start
   delay(BLE_GAP_MS);
   for (int i = 0; i < n; i++) bleType(s[i]);
