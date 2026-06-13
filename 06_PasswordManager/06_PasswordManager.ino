@@ -48,6 +48,7 @@ extern "C" {
   void hidBlePeerAddr(char *out, int n);   // connecting peer's BT address
   void hidBleSettleReset();           // re-arm typing settle on disconnect
   void hidBleTune();                  // request tight conn interval at connect
+  void hidBleForget();                // clear all BLE bonds (re-pair fresh)
 }
 
 #include <Arduino.h>
@@ -334,29 +335,24 @@ void typeViaHID(const char *s) {
                 s, settings.bleEnabled, hidBleCompiled(), hidBleConnected(),
                 settings.usbHidEnabled, hidUsbCompiled());
 
-  // The ESP32-S3 is dual-core and NimBLE (radio task) coexists with native
-  // USB HID — so BOTH transports can be live at once. We type to EVERY ready
-  // transport instead of picking one, so "BLE on" never disables USB and
-  // vice-versa. Whatever the device is connected to receives the text.
-  bool sentAny = false;
-
-  // BLE — wireless typing into a paired phone/laptop, but only after the user
-  // has ACCEPTED this connection on the device (bleAuthorized).
+  // ONE transport at a time. Both can be ENABLED and connected at once (the
+  // S3 is dual-core, NimBLE + native USB coexist), but typing to BOTH into the
+  // same computer doubles/garbles the text — so we pick one. BLE wins when the
+  // user has ACCEPTED it on-device (a deliberate "type wirelessly" choice);
+  // otherwise USB. (Want USB instead while BLE is paired? Reject/Block the BLE
+  // request, or turn Bluetooth off.)
   if (settings.bleEnabled && hidBleCompiled() && hidBleConnected() && bleAuthorized) {
-    Serial.println("[HID] sending → BLE");
+    Serial.println("[HID] routing → BLE");
     hidBlePrint(s);
     ledSet(0x0000FF, 200);
-    sentAny = true;
+    return;
   }
-  // USB-C HID — the Settings toggle is respected (default ON), and we only
-  // type here when a PC has actually enumerated the keyboard.
   if (settings.usbHidEnabled && hidUsbCompiled() && hidUsbMounted()) {
-    Serial.println("[HID] sending → USB");
+    Serial.println("[HID] routing → USB");
     hidUsbPrint(s);
     ledSet(0x00FF00, 200);
-    sentAny = true;
+    return;
   }
-  if (sentAny) return;
   Serial.println("[HID] no transport ready");
 
   // Full-screen modal — clearly explains what to do

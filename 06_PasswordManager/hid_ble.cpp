@@ -22,19 +22,18 @@
   static bool active      = false;   // advertising / accepting connections?
   static bool androidFix  = false;   // UK/Android layout: swap @ <-> " keycodes
 
-  // BLE HID timing. The KEY fix for "stuck / repeating keys": a key-down and
-  // its key-up MUST land in DIFFERENT BLE connection events, otherwise the
-  // host can miss the release and auto-repeat the last key forever (the
-  // "...gmmmmm" bug). kb.write() sends press+release back-to-back (same
-  // event), so we DON'T use it — we press, hold past one connection interval,
-  // then send a clean "all keys up" report, then a small gap before the next.
-  // Key-down must be held LONGER than the BLE connection interval so the
-  // key-down and key-up reports land in different connection events — else the
-  // host misses the release and auto-repeats (the Windows "likkkke" bug). 45ms
-  // safely spans the typical 15-48ms interval even if the tighter interval we
-  // request at connect-time gets rejected.
-  static const uint16_t BLE_HOLD_MS  = 45;   // key held
-  static const uint16_t BLE_GAP_MS   = 25;   // quiet gap so each report is delivered
+  // BLE HID timing — the "likkkke" repeat bug, explained:
+  //   The library's notify() (sendReport) is FIRE-AND-FORGET — if the radio's
+  //   tx buffer is full, the report is silently DROPPED. releaseAll() even
+  //   sends TWO reports (keyboard + an unused media report). Type fast and the
+  //   buffer overflows; the dropped reports are usually key-UPS, so the host
+  //   thinks the key is held and auto-repeats it ("likkkke" — and it gets
+  //   worse later in the word as the buffer fills up).
+  //   Fix: (a) one keyboard-only release per key via kb.release() (half the
+  //   traffic of releaseAll), and (b) a generous gap so the buffer drains
+  //   before the next key. Slower, but no drops = no repeats.
+  static const uint16_t BLE_HOLD_MS  = 40;   // key held before release
+  static const uint16_t BLE_GAP_MS   = 80;   // gap so the tx buffer drains
   static const uint16_t BLE_SETTLE_MS = 240; // wait before the 1st key (host subscribe)
   static bool everConn = false;              // have we ever been connected this link?
 
@@ -50,13 +49,17 @@
     if ((uint8_t)c >= 128) return;
     if (androidFix && c == '@') {
       kb.press(KEY_LEFT_SHIFT); kb.press('\'');   // @ on UK/Android
+      delay(BLE_HOLD_MS);
+      kb.release('\''); kb.release(KEY_LEFT_SHIFT);
     } else if (androidFix && c == '"') {
       kb.press(KEY_LEFT_SHIFT); kb.press('2');     // " on UK/Android
+      delay(BLE_HOLD_MS);
+      kb.release('2'); kb.release(KEY_LEFT_SHIFT);
     } else {
       kb.press((uint8_t)c);
+      delay(BLE_HOLD_MS);
+      kb.release((uint8_t)c);   // keyboard-only release (1 notify; clears shift too)
     }
-    delay(BLE_HOLD_MS);
-    kb.releaseAll();                                // clean key-up report
     delay(BLE_GAP_MS);
   }
 
@@ -64,7 +67,7 @@
   static void bleRawKey(uint8_t k) {
     kb.press(k);
     delay(BLE_HOLD_MS);
-    kb.releaseAll();
+    kb.release(k);
     delay(BLE_GAP_MS);
   }
 #endif
@@ -91,6 +94,18 @@ void hidBleTune() {
   if (peers.empty()) return;
   // min 15ms, max 22.5ms, latency 0, supervision timeout 4s
   srv->updateConnParams(peers[0], 12, 18, 0, 400);
+#endif
+}
+
+// Clear all stored BLE bonds. macOS/iOS (and sometimes Windows) refuse to
+// reconnect when the device still holds a stale bond from an older security
+// setting — wiping bonds lets the host pair fresh. Called when BLE is turned
+// OFF in Settings, so "toggle BLE off then on, then re-pair" is the recovery.
+void hidBleForget() {
+#if HID_BLE_ENABLE
+  NimBLEDevice::deleteAllBonds();
+  everConn = false;
+  Serial.println("[BLE] all bonds cleared — pair fresh on the host");
 #endif
 }
 

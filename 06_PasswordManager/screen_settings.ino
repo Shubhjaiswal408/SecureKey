@@ -391,6 +391,7 @@ void onTapSettings(int16_t tx, int16_t ty) {
     } else {
       bleAuthorized = false;
       hidBleEnd();
+      hidBleForget();        // wipe bonds → turning BLE off then on re-pairs fresh
       btConnected = false;
     }
     drawSettings(); return;            // inline flip — no confirmation page
