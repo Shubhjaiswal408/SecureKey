@@ -30,10 +30,13 @@
   //   thinks the key is held and auto-repeats it ("likkkke" — and it gets
   //   worse later in the word as the buffer fills up).
   //   Fix: (a) one keyboard-only release per key via kb.release() (half the
-  //   traffic of releaseAll), and (b) a generous gap so the buffer drains
-  //   before the next key. Slower, but no drops = no repeats.
-  static const uint16_t BLE_HOLD_MS  = 40;   // key held before release
-  static const uint16_t BLE_GAP_MS   = 80;   // gap so the tx buffer drains
+  //   traffic of releaseAll), and (b) a gap big enough that the tx buffer
+  //   fully drains before the next key — EVEN if the host rejected our tight
+  //   interval request and runs a slow ~50ms interval. At 2 reports/key and a
+  //   120ms gap the buffer always shrinks, so it can never overflow (which is
+  //   what caused the occasional "ssshhh" bursts). Slower, but no drops.
+  static const uint16_t BLE_HOLD_MS  = 35;   // key held before release
+  static const uint16_t BLE_GAP_MS   = 120;  // gap so the tx buffer drains
   static const uint16_t BLE_SETTLE_MS = 240; // wait before the 1st key (host subscribe)
   static bool everConn = false;              // have we ever been connected this link?
 
