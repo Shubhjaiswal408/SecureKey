@@ -9,9 +9,12 @@
 static PassRecord detailRec;
 static bool       passRevealed = false;
 
-#define DET_ROW_H   48
+// Rows stay full-size (54). Only the gaps between them were tightened (6→3)
+// so the bottom action bar clears the AMOLED's rounded corner with a proper
+// 16px margin — without shrinking the row content.
+#define DET_ROW_H   54
 #define DET_TOP     (STATUS_H + NAV_H + 8)
-#define ROW_Y(n)    (DET_TOP + (n) * (DET_ROW_H + 6))
+#define ROW_Y(n)    (DET_TOP + (n) * (DET_ROW_H + 3))
 
 static void drawDetailActions();   // bottom Edit | Fav | Delete bar (below)
 
@@ -88,8 +91,12 @@ void drawDetail() {
 }
 
 // ── Bottom action bar geometry (shared by draw + tap) ────────
-#define ACT_Y    (ROW_Y(5) - 4)
-#define ACT_H    46
+//  The panel's rounded corners are ~30-32px (see 01_HelloAMOLED). The bottom
+//  action bar sits below the last row with a 20px bottom inset so the
+//  EDIT/DELETE outer-bottom corners stay clear of that curve — without
+//  shrinking the rows. ACT_Y = 388, ACT_H = 40 → bottom = 428 (448 - 20).
+#define ACT_Y    (ROW_Y(4) + DET_ROW_H + 6)
+#define ACT_H    40
 #define ACT_GAP  10
 #define ACT_W    ((LCD_WIDTH - 2*SAFE_PAD - 2*ACT_GAP) / 3)   // 105
 static inline int16_t actX(uint8_t i) { return SAFE_PAD + i * (ACT_W + ACT_GAP); }
