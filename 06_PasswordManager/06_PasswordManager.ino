@@ -141,7 +141,6 @@ void ledSet(uint32_t c, uint32_t ms = 300) {
 }
 
 // ── Forward declarations ──────────────────────────────────────────────
-void drawBootLogo();
 void drawLock();    void onTapLock(int16_t,int16_t);
 void drawPin();     void onTapPin(int16_t,int16_t);    void pinSlideIn();
 void drawHome();    void onTapHome(int16_t,int16_t);
@@ -633,7 +632,6 @@ void setup() {
   // (Display_Brightness(0) = screen off), which looks like a dead screen.
   if (settings.brightness < 20) { settings.brightness = 140; saveSettings(); }
   out->Display_Brightness(settings.brightness);
-  drawBootLogo();   // Apple-style splash — shows while the rest of init runs
 
   Wire.begin(IIC_SDA, IIC_SCL, 400000);
   pinMode(USER_BTN_PIN, INPUT_PULLUP);
@@ -641,7 +639,15 @@ void setup() {
   Serial.printf("[MEM] PSRAM free: %u\n", ESP.getFreePsram());
   passwordIndex = (ListItem *)ps_malloc(MAX_PASSWORDS * sizeof(ListItem));
   if (!passwordIndex) {
+    // The canvas works (we got here) but the 1.9MB password index won't fit —
+    // PSRAM is missing/too small. Show it on the (working) canvas instead of a
+    // silent black hang.
     Serial.println("ERROR: ps_malloc failed for index");
+    gfx->fillScreen(C_BLACK);
+    textCenter(160, "LOW PSRAM", 3, C_RED);
+    textCenter(212, "index alloc failed", 2, C_WHITE);
+    textCenter(248, "set PSRAM = OPI", 2, C_GRAY_5);
+    flushScreen();
     while (1) delay(1000);
   }
 
