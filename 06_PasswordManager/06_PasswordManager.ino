@@ -594,7 +594,22 @@ void setup() {
   digitalWrite(TP_RST, HIGH); delay(100);
 
   if (!gfx->begin()) {
-    Serial.println("ERROR: canvas init failed — check OPI PSRAM.");
+    // The PSRAM double-buffer canvas could not initialise — almost always
+    // because PSRAM isn't enabled. Draw the reason DIRECTLY on the panel so
+    // the screen isn't just silent-black: if you SEE this red message the
+    // panel itself works and the fix is a board setting, not the hardware.
+    //   Tools -> PSRAM: "OPI PSRAM"   (and Flash 16MB, Partition app3M_fat9M)
+    Serial.println("ERROR: canvas init failed — set Tools -> PSRAM: OPI PSRAM");
+    out->begin();
+    out->fillScreen(0xF800);                  // red
+    out->Display_Brightness(200);
+    out->setTextColor(0xFFFF);                // white
+    out->setTextSize(3);
+    out->setCursor(60, 150); out->print("PSRAM");
+    out->setCursor(20, 188); out->print("CANVAS FAIL");
+    out->setTextSize(2);
+    out->setCursor(30, 250); out->print("Tools > PSRAM");
+    out->setCursor(40, 278); out->print("= OPI PSRAM");
     while (1) delay(1000);
   }
 
@@ -614,6 +629,9 @@ void setup() {
   // restart the countdown — pulling the plug no longer skips the wait.
   if (pinFails >= 3) pinLockUntil = millis() + pinLockDelayMs(pinFails);
 
+  // Safety floor: a corrupted/zero NVS brightness would leave the panel dark
+  // (Display_Brightness(0) = screen off), which looks like a dead screen.
+  if (settings.brightness < 20) { settings.brightness = 140; saveSettings(); }
   out->Display_Brightness(settings.brightness);
   drawBootLogo();   // Apple-style splash — shows while the rest of init runs
 
