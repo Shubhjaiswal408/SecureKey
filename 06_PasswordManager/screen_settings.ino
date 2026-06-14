@@ -335,8 +335,10 @@ static void factoryReset() {
   if (!settingsAskPin()) { drawSettings(); return; }   // cancelled
   if (!confirmErase())   { drawSettings(); return; }
 
-  // Wipe the vault and clear all settings (reseeds demo data on reboot).
-  FFat.remove("/db.bin");
+  // Wipe the entire FFat filesystem (format is guaranteed; simple remove can
+  // fail silently if a file handle is still open or FAT is corrupted).
+  FFat.end();
+  FFat.format();
   prefs.begin("skset", false);
   prefs.clear();
   prefs.end();

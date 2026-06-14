@@ -137,6 +137,7 @@ void ledSet(uint32_t c, uint32_t ms = 300) {
 }
 
 // ── Forward declarations ──────────────────────────────────────────────
+void drawBootLogo();
 void drawLock();    void onTapLock(int16_t,int16_t);
 void drawPin();     void onTapPin(int16_t,int16_t);    void pinSlideIn();
 void drawHome();    void onTapHome(int16_t,int16_t);
@@ -477,14 +478,14 @@ void bleConnectGate() {
     ledSet(0xFF0000, 250);
     Serial.println("[BLE] connection BLOCKED for 5 min");
   } else {                                   // REJECT
-    // Don't tear the stack down — a paired phone instantly auto-reconnects,
-    // which would loop the prompt forever (and NimBLE end/begin cycling is
-    // flaky). Typing stays blocked (bleAuthorized=false); just snooze the
-    // prompt so it doesn't nag.
+    // Snooze the gate for 2 minutes so a paired phone that auto-reconnects
+    // doesn't spam the prompt every 20 seconds.  Typing stays blocked
+    // (bleAuthorized=false); the link is left up so the phone doesn't
+    // instantly re-try pairing.
     bleAuthorized = false;
-    bleGateSnooze = millis() + 20000UL;      // 20 s of quiet
+    bleGateSnooze = millis() + 120000UL;     // 2 min quiet
     ledSet(0xFF0000, 200);
-    Serial.println("[BLE] connection REJECTED (snoozed 20s)");
+    Serial.println("[BLE] connection REJECTED (snoozed 2 min)");
   }
   btConnected = settings.bleEnabled && hidBleCompiled() && hidBleConnected();
   drawAll();
@@ -596,6 +597,7 @@ void setup() {
   if (pinFails >= 3) pinLockUntil = millis() + pinLockDelayMs(pinFails);
 
   out->Display_Brightness(settings.brightness);
+  drawBootLogo();   // Apple-style splash — shows while the rest of init runs
 
   Wire.begin(IIC_SDA, IIC_SCL, 400000);
   pinMode(USER_BTN_PIN, INPUT_PULLUP);
@@ -610,7 +612,6 @@ void setup() {
   if (!FFat.begin(true)) {
     Serial.println("ERROR: FFat mount failed");
   } else {
-    dbSeed();
     dbLoadIndex();
     Serial.printf("[DB] %u passwords loaded\n", passwordCount);
   }
